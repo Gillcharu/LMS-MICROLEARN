@@ -239,18 +239,59 @@ async function seed() {
     });
   }
 
-  await LiveSession.findOrCreate({
-    where: { title: 'Live Office Hour: Learning Sprints' },
-    defaults: {
-      creatorId: creator.id,
+  const demoSessions = [
+    {
+      title: 'Live Office Hour: Learning Sprints',
       description: 'Weekly Q&A for learners to improve sprint study habits.',
       startsAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
       durationMinutes: 45,
-      meetingUrl: 'https://example.com/live-session',
-      capacity: 200,
-      status: 'scheduled'
+      meetingUrl: 'https://www.youtube.com/watch?v=H14bBuluwB8'
+    },
+    {
+      title: 'Demo Session: DBMS 3NF Walkthrough',
+      description: 'Recorded demo class on normalization from 1NF to 3NF with examples.',
+      startsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      durationMinutes: 30,
+      meetingUrl: 'https://www.youtube.com/watch?v=ztHopE5Wnpc'
+    },
+    {
+      title: 'Demo Session: OS Deadlock Strategy',
+      description: 'Conceptual demo session for deadlock prevention and Banker algorithm intuition.',
+      startsAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+      durationMinutes: 35,
+      meetingUrl: 'https://www.youtube.com/watch?v=JjleJxX5xVg'
+    }
+  ];
+  await LiveSession.destroy({
+    where: {
+      creatorId: creator.id,
+      durationMinutes: 480
     }
   });
+
+  for (const s of demoSessions) {
+    const [row] = await LiveSession.findOrCreate({
+      where: { title: s.title },
+      defaults: {
+        creatorId: creator.id,
+        description: s.description,
+        startsAt: s.startsAt,
+        durationMinutes: s.durationMinutes,
+        meetingUrl: s.meetingUrl,
+        capacity: 200,
+        status: 'scheduled'
+      }
+    });
+    await row.update({
+      creatorId: creator.id,
+      description: s.description,
+      startsAt: s.startsAt,
+      durationMinutes: s.durationMinutes,
+      meetingUrl: s.meetingUrl,
+      capacity: 200,
+      status: 'scheduled'
+    });
+  }
 
   await Assignment.findOrCreate({
     where: { title: 'Sprint Reflection Journal', creatorId: creator.id },

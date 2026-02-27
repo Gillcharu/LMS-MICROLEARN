@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 
+function toYouTubeEmbed(url) {
+  if (!url) return null;
+  const match = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  if (!match) return null;
+  return `https://www.youtube.com/embed/${match[1]}`;
+}
+
 export default function SessionsPage() {
   const [sessions, setSessions] = useState([]);
   const [market, setMarket] = useState([]);
@@ -64,9 +71,26 @@ export default function SessionsPage() {
               <p><strong>{s.title}</strong></p>
               <p className="muted">{new Date(s.startsAt).toLocaleString()} • {s.durationMinutes} min</p>
               <p className="muted">By {s.creator?.name}</p>
-              <button type="button" disabled={busyKey === `enroll-${s.id}`} onClick={() => enroll(s.id)}>
-                {busyKey === `enroll-${s.id}` ? 'Enrolling...' : 'Enroll'}
-              </button>
+              <div className="row wrap">
+                <button type="button" disabled={busyKey === `enroll-${s.id}`} onClick={() => enroll(s.id)}>
+                  {busyKey === `enroll-${s.id}` ? 'Enrolling...' : 'Enroll'}
+                </button>
+                {s.meetingUrl && (
+                  <a className="ghost-btn" href={s.meetingUrl} target="_blank" rel="noreferrer">
+                    Watch Demo
+                  </a>
+                )}
+              </div>
+              {toYouTubeEmbed(s.meetingUrl) && (
+                <iframe
+                  title={`session-${s.id}`}
+                  src={toYouTubeEmbed(s.meetingUrl)}
+                  width="100%"
+                  height="200"
+                  style={{ border: 0, borderRadius: '10px', marginTop: '0.5rem' }}
+                  allowFullScreen
+                />
+              )}
             </div>
           ))}
         </article>

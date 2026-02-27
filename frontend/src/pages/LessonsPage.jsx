@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 export default function LessonsPage() {
+  const navigate = useNavigate();
   const [lessons, setLessons] = useState([]);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [maxDuration, setMaxDuration] = useState(15);
 
   useEffect(() => {
-    api.get('/lessons').then((res) => setLessons(res.data));
+    api.get('/lessons')
+      .then((res) => {
+        setLessons(res.data);
+        setError('');
+      })
+      .catch(() => setError('Unable to load lessons. Check backend server and login.'));
   }, []);
 
   const categories = useMemo(() => {
@@ -62,6 +69,7 @@ export default function LessonsPage() {
       </section>
 
       <div className="grid">
+        {error && <p className="error">{error}</p>}
         {filtered.map((lesson) => (
           <article key={lesson.id} className="card lesson-card">
             <p className="chip">{lesson.category}</p>
@@ -71,7 +79,9 @@ export default function LessonsPage() {
               <p><strong>{lesson.durationMinutes}</strong> min</p>
               <p><strong>{lesson.quizQuestions?.length || 0}</strong> quiz Qs</p>
             </div>
-            <Link className="cta-btn" to={`/lessons/${lesson.id}`}>Start Lesson</Link>
+            <button type="button" className="cta-btn" onClick={() => navigate(`/lessons/${lesson.id}`)}>
+              Start Lesson
+            </button>
           </article>
         ))}
       </div>

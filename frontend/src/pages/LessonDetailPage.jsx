@@ -13,6 +13,8 @@ export default function LessonDetailPage() {
   const { lessonId } = useParams();
   const { user } = useAuth();
   const [lesson, setLesson] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [status, setStatus] = useState('');
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
   const [comment, setComment] = useState('');
@@ -20,8 +22,13 @@ export default function LessonDetailPage() {
   const [elapsed, setElapsed] = useState(0);
 
   const load = async () => {
-    const { data } = await api.get(`/lessons/${lessonId}`);
-    setLesson(data);
+    try {
+      const { data } = await api.get(`/lessons/${lessonId}`);
+      setLesson(data);
+      setLoadError('');
+    } catch (err) {
+      setLoadError(err.response?.data?.error || 'Unable to open lesson.');
+    }
   };
 
   useEffect(() => { load(); }, [lessonId]);
@@ -40,20 +47,35 @@ export default function LessonDetailPage() {
 
   const markStarted = async () => {
     if (!user) return;
-    await api.post(`/progress/lessons/${lessonId}`, { status: 'in_progress', completionPercent: 35, timeSpentSeconds: elapsed || 120 });
-    setRunning(true);
+    try {
+      await api.post(`/progress/lessons/${lessonId}`, { status: 'in_progress', completionPercent: 35, timeSpentSeconds: elapsed || 120 });
+      setRunning(true);
+      setStatus('Session started.');
+    } catch (err) {
+      setStatus(err.response?.data?.error || 'Could not start session.');
+    }
   };
 
   const stopAndSaveTime = async () => {
     if (!user) return;
-    await api.post(`/progress/lessons/${lessonId}`, { status: 'in_progress', completionPercent: 60, timeSpentSeconds: elapsed });
-    setRunning(false);
+    try {
+      await api.post(`/progress/lessons/${lessonId}`, { status: 'in_progress', completionPercent: 60, timeSpentSeconds: elapsed });
+      setRunning(false);
+      setStatus('Progress saved.');
+    } catch (err) {
+      setStatus(err.response?.data?.error || 'Could not save progress.');
+    }
   };
 
   const submitQuiz = async () => {
-    const { data } = await api.post(`/progress/lessons/${lessonId}/quiz`, { answers });
-    setResult(data);
-    setRunning(false);
+    try {
+      const { data } = await api.post(`/progress/lessons/${lessonId}/quiz`, { answers });
+      setResult(data);
+      setRunning(false);
+      setStatus('Quiz submitted.');
+    } catch (err) {
+      setStatus(err.response?.data?.error || 'Quiz submission failed.');
+    }
   };
 
   const postComment = async () => {
@@ -68,6 +90,7 @@ export default function LessonDetailPage() {
     load();
   };
 
+  if (loadError) return <main className="container"><p className="error">{loadError}</p></main>;
   if (!lesson) return <main className="container">Loading lesson...</main>;
 
   const recommended = lesson.durationMinutes * 60;
@@ -89,6 +112,7 @@ export default function LessonDetailPage() {
           </div>
         </div>
         <div className="progress-track"><span style={{ width: `${pacePct}%` }} /></div>
+        {status && <p className="ok">{status}</p>}
         <p>{lesson.contentBody}</p>
         {lesson.mediaUrl && <a href={lesson.mediaUrl} target="_blank" rel="noreferrer">Open Media Resource</a>}
         {user && (
