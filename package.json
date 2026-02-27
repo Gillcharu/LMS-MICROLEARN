@@ -1,0 +1,11 @@
+{
+  "name": "microlearn",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "seed": "npm --prefix backend run seed"
+  }
+}

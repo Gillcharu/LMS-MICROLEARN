@@ -1,0 +1,10 @@
+<svg width="600" height="360" viewBox="0 0 600 360" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="360" rx="24" fill="#fff7ed"/>
+  <rect x="90" y="90" width="420" height="180" rx="14" fill="#ffedd5" stroke="#fdba74" stroke-width="3"/>
+  <rect x="120" y="130" width="170" height="18" rx="6" fill="#fb923c"/>
+  <rect x="120" y="160" width="290" height="14" rx="6" fill="#fdba74"/>
+  <rect x="120" y="187" width="250" height="14" rx="6" fill="#fdba74"/>
+  <circle cx="445" cy="155" r="35" fill="#f97316"/>
+  <circle cx="445" cy="238" r="35" fill="#ea580c"/>
+  <text x="120" y="238" fill="#9a3412" font-size="22" font-family="Arial">Parent Progress Dashboard</text>
+</svg>
