@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { Certificate, Lesson, Progress } from '../models/index.js';
+import { Certificate, Lesson, Progress, User } from '../models/index.js';
+import { makeSimpleCertificatePdf } from '../services/pdfService.js';
 import { httpError } from '../utils/httpError.js';
 
 export async function issueCertificate(req, res, next) {
@@ -25,4 +26,26 @@ export async function myCertificates(req, res) {
     order: [['issuedAt', 'DESC']]
   });
   res.json(rows);
+}
+
+export async function downloadCertificatePdf(req, res, next) {
+  const certificate = await Certificate.findByPk(req.params.certificateId, {
+    include: [
+      { model: Lesson, attributes: ['title', 'category'] },
+      { model: User, attributes: ['name'] }
+    ]
+  });
+  if (!certificate || certificate.userId !== req.user.id) return next(httpError(404, 'Certificate not found'));
+
+  const pdf = makeSimpleCertificatePdf({
+    learnerName: certificate.User?.name || 'Learner',
+    lessonTitle: certificate.Lesson?.title || 'Lesson',
+    category: certificate.Lesson?.category || 'General',
+    code: certificate.code,
+    issuedAt: certificate.issuedAt
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=certificate-${certificate.id}.pdf`);
+  res.send(pdf);
 }

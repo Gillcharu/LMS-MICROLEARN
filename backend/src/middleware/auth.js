@@ -1,4 +1,4 @@
-import { User } from '../models/index.js';
+import { User, UserSuspension } from '../models/index.js';
 import { verifyToken } from '../utils/jwt.js';
 import { httpError } from '../utils/httpError.js';
 
@@ -13,6 +13,10 @@ export async function requireAuth(req, res, next) {
     const payload = verifyToken(token);
     const user = await User.findByPk(payload.sub);
     if (!user) return next(httpError(401, 'User account not found'));
+    const suspension = await UserSuspension.findOne({ where: { userId: user.id, active: true } });
+    if (suspension && (!suspension.suspendedUntil || new Date(suspension.suspendedUntil) > new Date())) {
+      return next(httpError(403, `Account suspended: ${suspension.reason}`));
+    }
     req.user = user;
     return next();
   } catch {

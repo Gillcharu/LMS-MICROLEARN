@@ -50,6 +50,8 @@ export default function CreatorStudioPage() {
   const [token, setToken] = useState('demo-token');
 
   const [analytics, setAnalytics] = useState(null);
+  const [retention, setRetention] = useState({ dropoff: [], questionAccuracy: [] });
+  const [recordingForm, setRecordingForm] = useState({ sessionId: '', title: '', videoUrl: '' });
 
   const [lesson, setLesson] = useState({
     title: '',
@@ -64,14 +66,15 @@ export default function CreatorStudioPage() {
   });
 
   const load = async () => {
-    const [summaryRes, libraryRes, liveRes, subRes, revenueRes, integrationRes, analyticsRes] = await Promise.all([
+    const [summaryRes, libraryRes, liveRes, subRes, revenueRes, integrationRes, analyticsRes, retentionRes] = await Promise.all([
       api.get('/creator/summary'),
       api.get('/creator/library'),
       api.get('/live/creator/mine'),
       api.get('/assignments/creator/submissions'),
       api.get('/monetization/creator/revenue'),
       api.get('/integrations'),
-      api.get('/analytics/creator')
+      api.get('/analytics/creator'),
+      api.get('/analytics/creator/retention')
     ]);
     setSummary(summaryRes.data);
     setLibrary(libraryRes.data);
@@ -80,6 +83,7 @@ export default function CreatorStudioPage() {
     setRevenue(revenueRes.data);
     setIntegrations(integrationRes.data);
     setAnalytics(analyticsRes.data);
+    setRetention(retentionRes.data);
   };
 
   useEffect(() => { load(); }, []);
@@ -195,6 +199,17 @@ export default function CreatorStudioPage() {
     load();
   };
 
+  const addRecording = async (e) => {
+    e.preventDefault();
+    await api.post(`/live/${recordingForm.sessionId}/recordings`, {
+      title: recordingForm.title,
+      videoUrl: recordingForm.videoUrl
+    });
+    setMsg('Session recording added.');
+    setRecordingForm({ sessionId: '', title: '', videoUrl: '' });
+    load();
+  };
+
   if (!summary) return <main className="container">Loading creator studio...</main>;
 
   return (
@@ -290,6 +305,19 @@ export default function CreatorStudioPage() {
         </form>
       </section>
 
+      <section className="card">
+        <h3>Session Recordings</h3>
+        <form className="row wrap" onSubmit={addRecording}>
+          <select value={recordingForm.sessionId} onChange={(e) => setRecordingForm({ ...recordingForm, sessionId: e.target.value })} required>
+            <option value="">Select session</option>
+            {liveMine.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+          </select>
+          <input placeholder="Recording title" value={recordingForm.title} onChange={(e) => setRecordingForm({ ...recordingForm, title: e.target.value })} required />
+          <input placeholder="Video URL" value={recordingForm.videoUrl} onChange={(e) => setRecordingForm({ ...recordingForm, videoUrl: e.target.value })} required />
+          <button type="submit">Add Recording</button>
+        </form>
+      </section>
+
       <section className="grid two-col">
         <form className="card" onSubmit={createAssignment}>
           <h3>Assignment Workspace</h3>
@@ -367,6 +395,20 @@ export default function CreatorStudioPage() {
             ))}
           </>
         )}
+        <h4>Retention Drop-off</h4>
+        {retention.dropoff.map((row) => (
+          <div className="progress-row" key={row.lessonId}>
+            <p><strong>{row.title}</strong></p>
+            <p className="muted">Under 40%: {row.under40} • 40-79%: {row.between40And79} • 80%+: {row.over80}</p>
+          </div>
+        ))}
+        <h4>Quiz Question Accuracy</h4>
+        {retention.questionAccuracy.slice(0, 12).map((row) => (
+          <div className="progress-row" key={row.questionId}>
+            <p>Question #{row.questionId}</p>
+            <p className="muted">Accuracy {row.accuracyPercent}% ({row.correct}/{row.attempts})</p>
+          </div>
+        ))}
       </section>
     </main>
   );

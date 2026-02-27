@@ -20,12 +20,18 @@ import monetizationRoutes from './routes/monetizationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import integrationRoutes from './routes/integrationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({
+  limit: '2mb',
+  verify: (req, _res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 
 app.use('/api/system', systemRoutes);
 app.use('/api/auth', authRoutes);
@@ -47,6 +53,7 @@ app.use('/api/monetization', monetizationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(errorHandler);
 

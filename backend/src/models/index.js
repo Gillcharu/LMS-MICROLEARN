@@ -25,6 +25,13 @@ export const Lesson = sequelize.define('Lesson', {
   mediaUrl: { type: DataTypes.STRING },
   difficulty: { type: DataTypes.ENUM('beginner', 'intermediate', 'advanced'), defaultValue: 'beginner' },
   published: { type: DataTypes.BOOLEAN, defaultValue: false }
+}, {
+  indexes: [
+    { fields: ['title'] },
+    { fields: ['category'] },
+    { fields: ['difficulty'] },
+    { fields: ['creatorId'] }
+  ]
 });
 
 export const QuizQuestion = sequelize.define('QuizQuestion', {
@@ -242,6 +249,56 @@ export const ContentFlag = sequelize.define('ContentFlag', {
   status: { type: DataTypes.ENUM('open', 'resolved'), defaultValue: 'open' }
 });
 
+export const Notification = sequelize.define('Notification', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  type: { type: DataTypes.STRING, allowNull: false },
+  title: { type: DataTypes.STRING, allowNull: false },
+  message: { type: DataTypes.TEXT, allowNull: false },
+  readAt: { type: DataTypes.DATE }
+});
+
+export const QuizAttempt = sequelize.define('QuizAttempt', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  lessonId: { type: DataTypes.INTEGER, allowNull: false },
+  attemptNo: { type: DataTypes.INTEGER, allowNull: false },
+  token: { type: DataTypes.STRING, allowNull: false, unique: true },
+  questionOrder: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+  answerMap: { type: DataTypes.JSON, allowNull: false, defaultValue: {} },
+  score: { type: DataTypes.FLOAT, defaultValue: 0 },
+  startedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
+  submittedAt: { type: DataTypes.DATE },
+  expiresAt: { type: DataTypes.DATE, allowNull: false },
+  status: { type: DataTypes.ENUM('active', 'submitted', 'expired'), defaultValue: 'active' }
+});
+
+export const LiveSessionRecording = sequelize.define('LiveSessionRecording', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  sessionId: { type: DataTypes.INTEGER, allowNull: false },
+  creatorId: { type: DataTypes.INTEGER, allowNull: false },
+  title: { type: DataTypes.STRING, allowNull: false },
+  videoUrl: { type: DataTypes.STRING, allowNull: false },
+  thumbnailUrl: { type: DataTypes.STRING }
+});
+
+export const ModerationAudit = sequelize.define('ModerationAudit', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  adminId: { type: DataTypes.INTEGER, allowNull: false },
+  targetType: { type: DataTypes.STRING, allowNull: false },
+  targetId: { type: DataTypes.INTEGER, allowNull: false },
+  action: { type: DataTypes.STRING, allowNull: false },
+  note: { type: DataTypes.TEXT }
+});
+
+export const UserSuspension = sequelize.define('UserSuspension', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
+  reason: { type: DataTypes.STRING, allowNull: false },
+  suspendedUntil: { type: DataTypes.DATE },
+  active: { type: DataTypes.BOOLEAN, defaultValue: true }
+});
+
 User.hasMany(Lesson, { foreignKey: 'creatorId', as: 'lessons' });
 Lesson.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
 
@@ -353,6 +410,25 @@ User.hasMany(ContentFlag, { foreignKey: 'reporterId', as: 'contentFlags' });
 ContentFlag.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter' });
 Lesson.hasMany(ContentFlag, { foreignKey: 'lessonId', as: 'flags' });
 ContentFlag.belongsTo(Lesson, { foreignKey: 'lessonId' });
+
+User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
+Notification.belongsTo(User, { foreignKey: 'userId' });
+
+User.hasMany(QuizAttempt, { foreignKey: 'userId', as: 'quizAttempts' });
+QuizAttempt.belongsTo(User, { foreignKey: 'userId' });
+Lesson.hasMany(QuizAttempt, { foreignKey: 'lessonId', as: 'quizAttempts' });
+QuizAttempt.belongsTo(Lesson, { foreignKey: 'lessonId' });
+
+LiveSession.hasMany(LiveSessionRecording, { foreignKey: 'sessionId', as: 'recordings' });
+LiveSessionRecording.belongsTo(LiveSession, { foreignKey: 'sessionId' });
+User.hasMany(LiveSessionRecording, { foreignKey: 'creatorId', as: 'sessionRecordings' });
+LiveSessionRecording.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
+
+User.hasMany(ModerationAudit, { foreignKey: 'adminId', as: 'moderationActions' });
+ModerationAudit.belongsTo(User, { foreignKey: 'adminId', as: 'admin' });
+
+User.hasOne(UserSuspension, { foreignKey: 'userId', as: 'suspension' });
+UserSuspension.belongsTo(User, { foreignKey: 'userId' });
 
 export async function initDb() {
   await sequelize.sync();

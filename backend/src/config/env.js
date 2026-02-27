@@ -14,5 +14,9 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET || 'dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   dbPath,
-  mediaBaseUrl: process.env.MEDIA_BASE_URL || 'https://media.microlearn.local'
+  mediaBaseUrl: process.env.MEDIA_BASE_URL || 'https://media.microlearn.local',
+  appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:5173',
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  notificationEmailFrom: process.env.NOTIFICATION_EMAIL_FROM || 'no-reply@microlearn.app'
 };

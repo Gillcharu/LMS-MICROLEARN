@@ -9,6 +9,7 @@ export default function DashboardPage() {
   const [assignments, setAssignments] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [market, setMarket] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [aiHint, setAiHint] = useState('');
   const [aiQuestion, setAiQuestion] = useState('Give me a retention tip for this week');
   const [hintLessonId, setHintLessonId] = useState('');
@@ -16,14 +17,15 @@ export default function DashboardPage() {
   const [busyPurchaseId, setBusyPurchaseId] = useState(null);
 
   const load = async () => {
-    const [dash, prog, certs, live, asg, subs, marketplace] = await Promise.all([
+    const [dash, prog, certs, live, asg, subs, marketplace, noteRes] = await Promise.all([
       api.get('/dashboard'),
       api.get('/progress/mine'),
       api.get('/certificates/mine'),
       api.get('/live'),
       api.get('/assignments'),
       api.get('/assignments/mine/submissions'),
-      api.get('/monetization/marketplace')
+      api.get('/monetization/marketplace'),
+      api.get('/notifications/mine')
     ]);
     setStats(dash.data);
     setProgress(prog.data);
@@ -32,11 +34,13 @@ export default function DashboardPage() {
     setAssignments(asg.data.slice(0, 8));
     setSubmissions(subs.data.slice(0, 8));
     setMarket(marketplace.data.slice(0, 6));
+    setNotifications((noteRes.data || []).slice(0, 8));
     if (prog.data[0]?.lessonId) setHintLessonId(String(prog.data[0].lessonId));
   };
 
   useEffect(() => {
     load();
+    api.post('/notifications/streak-risk-check').catch(() => {});
   }, []);
 
   const askHint = async () => {
@@ -66,6 +70,11 @@ export default function DashboardPage() {
   const purchase = async (offeringId) => {
     setBusyPurchaseId(offeringId);
     try {
+      const checkoutRes = await api.post(`/monetization/offerings/${offeringId}/checkout`);
+      if (checkoutRes.data?.checkoutUrl) {
+        window.location.href = checkoutRes.data.checkoutUrl;
+        return;
+      }
       const { data } = await api.post(`/monetization/offerings/${offeringId}/purchase`);
       setStatus(data.message || 'Purchase successful.');
       load();
@@ -74,6 +83,23 @@ export default function DashboardPage() {
     } finally {
       setBusyPurchaseId(null);
     }
+  };
+
+  const markRead = async (id) => {
+    await api.post(`/notifications/${id}/read`);
+    load();
+  };
+
+  const downloadCertificate = async (certificateId) => {
+    const { data } = await api.get(`/certificates/${certificateId}/pdf`, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `certificate-${certificateId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   };
 
   if (!stats) return <main className="container">Loading dashboard...</main>;
@@ -105,8 +131,25 @@ export default function DashboardPage() {
         <article className="card">
           <h3>Certificates</h3>
           {certificates.length === 0 && <p className="muted">No certificates yet. Complete lessons and issue certificates.</p>}
-          {certificates.map((c) => <p key={c.id}>🏅 {c.Lesson?.title} ({new Date(c.issuedAt).toLocaleDateString()})</p>)}
+          {certificates.map((c) => (
+            <div key={c.id} className="lesson-item">
+              <p>🏅 {c.Lesson?.title} ({new Date(c.issuedAt).toLocaleDateString()})</p>
+              <button className="ghost-btn" onClick={() => downloadCertificate(c.id)}>Download PDF</button>
+            </div>
+          ))}
         </article>
+      </section>
+
+      <section className="card">
+        <h3>Notifications</h3>
+        {notifications.length === 0 && <p className="muted">No notifications</p>}
+        {notifications.map((n) => (
+          <div key={n.id} className="lesson-item">
+            <p><strong>{n.title}</strong></p>
+            <p>{n.message}</p>
+            {!n.readAt && <button className="ghost-btn" onClick={() => markRead(n.id)}>Mark Read</button>}
+          </div>
+        ))}
       </section>
 
       <section className="grid two-col">

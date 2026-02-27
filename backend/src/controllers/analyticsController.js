@@ -1,4 +1,4 @@
-import { Assignment, AssignmentSubmission, CreatorOffering, LearningPath, Lesson, PathEnrollment, Progress, Purchase, User } from '../models/index.js';
+import { Assignment, AssignmentSubmission, CreatorOffering, LearningPath, Lesson, PathEnrollment, Progress, Purchase, QuizAttempt, User } from '../models/index.js';
 
 export async function creatorAnalytics(req, res) {
   const creatorId = req.user.id;
@@ -50,4 +50,40 @@ export async function adminAnalytics(req, res) {
   const completionRate = progresses ? Math.round((completionCount / progresses) * 100) : 0;
 
   res.json({ users, lessons, paths, progressRecords: progresses, completionRate, paidPurchases: purchases });
+}
+
+export async function creatorRetentionAnalytics(req, res) {
+  const lessons = await Lesson.findAll({ where: { creatorId: req.user.id }, attributes: ['id', 'title'] });
+  const lessonIds = lessons.map((l) => l.id);
+  if (!lessonIds.length) return res.json({ dropoff: [], questionAccuracy: [] });
+
+  const progresses = await Progress.findAll({ where: { lessonId: lessonIds } });
+  const attempts = await QuizAttempt.findAll({ where: { lessonId: lessonIds, status: 'submitted' } });
+
+  const dropoff = lessons.map((lesson) => {
+    const rows = progresses.filter((p) => p.lessonId === lesson.id);
+    const bucket = { under40: 0, between40And79: 0, over80: 0 };
+    rows.forEach((r) => {
+      if (r.completionPercent < 40) bucket.under40 += 1;
+      else if (r.completionPercent < 80) bucket.between40And79 += 1;
+      else bucket.over80 += 1;
+    });
+    return { lessonId: lesson.id, title: lesson.title, ...bucket };
+  });
+
+  const questionMap = {};
+  attempts.forEach((attempt) => {
+    const answers = attempt.answerMap || {};
+    Object.entries(answers).forEach(([qId, row]) => {
+      if (!questionMap[qId]) questionMap[qId] = { questionId: Number(qId), attempts: 0, correct: 0 };
+      questionMap[qId].attempts += 1;
+      if (row.isCorrect) questionMap[qId].correct += 1;
+    });
+  });
+  const questionAccuracy = Object.values(questionMap).map((row) => ({
+    ...row,
+    accuracyPercent: row.attempts ? Math.round((row.correct / row.attempts) * 100) : 0
+  }));
+
+  res.json({ dropoff, questionAccuracy });
 }

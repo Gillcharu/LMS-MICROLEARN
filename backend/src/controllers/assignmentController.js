@@ -1,4 +1,5 @@
-import { Assignment, AssignmentSubmission, Lesson, User } from '../models/index.js';
+import { Assignment, AssignmentSubmission, Lesson, Progress, User } from '../models/index.js';
+import { createNotification } from '../services/notificationService.js';
 import { httpError } from '../utils/httpError.js';
 
 export async function createAssignment(req, res, next) {
@@ -9,6 +10,19 @@ export async function createAssignment(req, res, next) {
   if (!lesson || lesson.creatorId !== req.user.id) return next(httpError(403, 'Can only create assignments for your own lessons'));
 
   const row = await Assignment.create({ creatorId: req.user.id, lessonId, title, description, dueAt, maxPoints, published: true });
+
+  const activeLearners = await Progress.findAll({
+    where: { lessonId },
+    attributes: ['userId'],
+    group: ['userId']
+  });
+  await Promise.all(activeLearners.map((p) => createNotification({
+    userId: p.userId,
+    type: 'assignment_new',
+    title: 'New assignment available',
+    message: `New assignment posted: ${title}`
+  })));
+
   res.status(201).json(row);
 }
 
@@ -52,6 +66,12 @@ export async function gradeSubmission(req, res, next) {
   submission.feedback = req.body.feedback ?? submission.feedback;
   submission.status = 'graded';
   await submission.save();
+  await createNotification({
+    userId: submission.userId,
+    type: 'assignment_graded',
+    title: 'Assignment graded',
+    message: `${submission.Assignment?.title || 'Assignment'} was graded.`
+  });
 
   res.json(submission);
 }

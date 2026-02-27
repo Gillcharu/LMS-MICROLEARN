@@ -10,6 +10,7 @@ function toYouTubeEmbed(url) {
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState([]);
+  const [recordingsBySession, setRecordingsBySession] = useState({});
   const [market, setMarket] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [status, setStatus] = useState('');
@@ -22,11 +23,21 @@ export default function SessionsPage() {
       api.get('/monetization/purchases/mine')
     ]);
     setSessions(liveRes.data);
+    const recordingPairs = await Promise.all(
+      (liveRes.data || []).map(async (s) => {
+        const res = await api.get(`/live/${s.id}/recordings`);
+        return [s.id, res.data || []];
+      })
+    );
+    setRecordingsBySession(Object.fromEntries(recordingPairs));
     setMarket(marketRes.data);
     setPurchases(purchaseRes.data);
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('purchase') === 'success') setStatus('Payment success. Access granted after Stripe confirmation.');
+    if (params.get('purchase') === 'cancelled') setStatus('Payment cancelled.');
     load();
   }, []);
 
@@ -45,11 +56,28 @@ export default function SessionsPage() {
   const purchase = async (id) => {
     setBusyKey(`buy-${id}`);
     try {
-      const { data } = await api.post(`/monetization/offerings/${id}/purchase`);
-      setStatus(data.message || 'Purchase successful.');
+      const { data } = await api.post(`/monetization/offerings/${id}/checkout`);
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      const fallback = await api.post(`/monetization/offerings/${id}/purchase`);
+      setStatus(fallback.data.message || 'Purchase successful.');
       load();
     } catch (err) {
-      setStatus(err.response?.data?.error || 'Purchase failed.');
+      const message = err.response?.data?.error || '';
+      if (message.toLowerCase().includes('stripe is not configured')) {
+        try {
+          const fallback = await api.post(`/monetization/offerings/${id}/purchase`);
+          setStatus(fallback.data.message || 'Purchase successful (simulation).');
+          load();
+          return;
+        } catch (fallbackErr) {
+          setStatus(fallbackErr.response?.data?.error || 'Purchase failed.');
+          return;
+        }
+      }
+      setStatus(message || 'Purchase failed.');
     } finally {
       setBusyKey('');
     }
@@ -91,6 +119,13 @@ export default function SessionsPage() {
                   allowFullScreen
                 />
               )}
+              {(recordingsBySession[s.id] || []).map((r) => (
+                <div key={r.id} className="lesson-item">
+                  <p><strong>Recording:</strong> {r.title}</p>
+                  {r.thumbnailUrl && <img src={r.thumbnailUrl} alt={r.title} className="thumb" />}
+                  <a className="ghost-btn" href={r.videoUrl} target="_blank" rel="noreferrer">Open Recording</a>
+                </div>
+              ))}
             </div>
           ))}
         </article>

@@ -11,6 +11,7 @@ export default function ParentTrackingPage() {
   const [childProgress, setChildProgress] = useState([]);
   const [alertPref, setAlertPref] = useState(null);
   const [alertPreview, setAlertPreview] = useState([]);
+  const [weeklyReport, setWeeklyReport] = useState([]);
   const [status, setStatus] = useState('');
 
   const load = async () => {
@@ -24,6 +25,8 @@ export default function ParentTrackingPage() {
       setChildren(childRes.data);
       setAlertPref(prefRes.data);
       setAlertPreview(previewRes.data.summaries || []);
+      const reportRes = await api.get('/parent-alerts/weekly-report');
+      setWeeklyReport(reportRes.data.reports || []);
     } else {
       const { data } = await api.get('/parents/mine');
       setParents(data);
@@ -118,6 +121,17 @@ export default function ParentTrackingPage() {
                 <p><strong>{p.Lesson?.title}</strong></p>
                 <p className="muted">{p.status} • quiz {Math.round(p.quizScore)}%</p>
                 <div className="progress-track"><span style={{ width: `${p.completionPercent}%` }} /></div>
+              </div>
+            ))}
+          </article>
+
+          <article className="card two-col-span">
+            <h3>Weekly Report</h3>
+            {weeklyReport.map((r) => (
+              <div key={r.childId} className="lesson-item">
+                <p><strong>{r.childName}</strong></p>
+                <p className="muted">Completed: {r.weeklyCompletedLessons} • Avg Quiz: {r.avgQuizScore}% • Streak: {r.streakDays} days</p>
+                <p>{r.recommendation}</p>
               </div>
             ))}
           </article>

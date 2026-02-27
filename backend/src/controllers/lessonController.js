@@ -1,4 +1,5 @@
 import { Comment, Lesson, Like, QuizQuestion, User } from '../models/index.js';
+import { Op } from 'sequelize';
 import { httpError } from '../utils/httpError.js';
 import { addPoints } from '../services/gamificationService.js';
 
@@ -13,6 +14,46 @@ export async function listLessons(req, res) {
   const lessons = await Lesson.findAll({
     where: { published: true },
     include: [{ model: User, as: 'creator', attributes: ['id', 'name'] }, { model: QuizQuestion, as: 'quizQuestions' }],
+    order: [['createdAt', 'DESC']]
+  });
+  res.json(lessons);
+}
+
+export async function searchLessons(req, res) {
+  const {
+    q = '',
+    topic = '',
+    tags = '',
+    creator = '',
+    difficulty = ''
+  } = req.query;
+
+  const where = { published: true };
+  if (difficulty) where.difficulty = difficulty;
+  if (topic) where.category = { [Op.like]: `%${topic}%` };
+
+  const searchTokens = [q, ...String(tags).split(',').map((t) => t.trim()).filter(Boolean)].filter(Boolean);
+  if (searchTokens.length) {
+    where[Op.and] = searchTokens.map((token) => ({
+      [Op.or]: [
+        { title: { [Op.like]: `%${token}%` } },
+        { description: { [Op.like]: `%${token}%` } },
+        { category: { [Op.like]: `%${token}%` } }
+      ]
+    }));
+  }
+
+  const lessons = await Lesson.findAll({
+    where,
+    include: [
+      {
+        model: User,
+        as: 'creator',
+        attributes: ['id', 'name'],
+        where: creator ? { name: { [Op.like]: `%${creator}%` } } : undefined
+      },
+      { model: QuizQuestion, as: 'quizQuestions' }
+    ],
     order: [['createdAt', 'DESC']]
   });
   res.json(lessons);

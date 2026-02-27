@@ -20,6 +20,8 @@ export default function LessonDetailPage() {
   const [comment, setComment] = useState('');
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [quizAttempt, setQuizAttempt] = useState(null);
+  const [quizSecondsLeft, setQuizSecondsLeft] = useState(0);
 
   const load = async () => {
     try {
@@ -40,6 +42,16 @@ export default function LessonDetailPage() {
     }, 1000);
     return () => clearInterval(id);
   }, [running]);
+
+  useEffect(() => {
+    if (!quizAttempt) return undefined;
+    const id = setInterval(() => {
+      const left = Math.max(0, Math.floor((new Date(quizAttempt.expiresAt).getTime() - Date.now()) / 1000));
+      setQuizSecondsLeft(left);
+      if (left === 0) setQuizAttempt(null);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [quizAttempt]);
 
   const totalQuiz = lesson?.quizQuestions?.length || 0;
   const answeredCount = useMemo(() => Object.keys(answers).length, [answers]);
@@ -69,12 +81,29 @@ export default function LessonDetailPage() {
 
   const submitQuiz = async () => {
     try {
-      const { data } = await api.post(`/progress/lessons/${lessonId}/quiz`, { answers });
+      const { data } = await api.post(`/progress/lessons/${lessonId}/quiz`, {
+        answers,
+        attemptToken: quizAttempt?.attemptToken
+      });
       setResult(data);
       setRunning(false);
+      setQuizAttempt(null);
       setStatus('Quiz submitted.');
     } catch (err) {
       setStatus(err.response?.data?.error || 'Quiz submission failed.');
+    }
+  };
+
+  const startTimedQuiz = async () => {
+    try {
+      const { data } = await api.post(`/progress/lessons/${lessonId}/quiz/start`);
+      setQuizAttempt(data);
+      setQuizSecondsLeft(data.durationSeconds);
+      setAnswers({});
+      setResult(null);
+      setStatus(`Timed quiz started. Attempt ${data.attemptNo}/3`);
+    } catch (err) {
+      setStatus(err.response?.data?.error || 'Unable to start quiz attempt.');
     }
   };
 
@@ -95,6 +124,9 @@ export default function LessonDetailPage() {
 
   const recommended = lesson.durationMinutes * 60;
   const pacePct = Math.min(100, Math.round((elapsed / recommended) * 100));
+  const orderedQuestions = quizAttempt?.questionOrder?.length
+    ? [...lesson.quizQuestions].sort((a, b) => quizAttempt.questionOrder.indexOf(a.id) - quizAttempt.questionOrder.indexOf(b.id))
+    : lesson.quizQuestions;
 
   return (
     <main className="container">
@@ -126,10 +158,13 @@ export default function LessonDetailPage() {
       <section className="card">
         <div className="row between wrap">
           <h3>Quiz ({totalQuiz} questions)</h3>
-          <span className="pill">{quizProgress}% answered</span>
+          <span className="pill">
+            {quizAttempt ? `Time left ${formatTimer(quizSecondsLeft)}` : `${quizProgress}% answered`}
+          </span>
         </div>
+        {user && <button className="ghost-btn" onClick={startTimedQuiz}>Start Timed Quiz</button>}
         <div className="progress-track"><span style={{ width: `${quizProgress}%` }} /></div>
-        {lesson.quizQuestions.map((q, idx) => (
+        {orderedQuestions.map((q, idx) => (
           <div key={q.id} className="quiz-q">
             <p>{idx + 1}. {q.prompt}</p>
             {['A', 'B', 'C', 'D'].map((opt) => (
@@ -145,7 +180,7 @@ export default function LessonDetailPage() {
             ))}
           </div>
         ))}
-        {user && <button disabled={answeredCount !== totalQuiz} onClick={submitQuiz}>Submit Quiz</button>}
+        {user && <button disabled={answeredCount !== totalQuiz || (quizAttempt && quizSecondsLeft === 0)} onClick={submitQuiz}>Submit Quiz</button>}
         {result && <p className={result.passed ? 'ok' : 'error'}>Score: {result.score}% ({result.correct}/{result.total}) {result.passed ? 'Passed' : 'Try again'}</p>}
       </section>
 
